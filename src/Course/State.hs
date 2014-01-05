@@ -1,3 +1,5 @@
+{-# LANGUAGE UnicodeSyntax #-}
+
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -35,26 +37,48 @@ newtype State s a =
 -- >>> runState ((+1) <$> pure 0) 0
 -- (1,0)
 instance Functor (State s) where
-  (<$>) =
-      error "todo"
-
+  -- Functor f         ⇒ (<$>) ∷ (a -> b) → f a → f b
+  -- Functor (State s) ⇒ (<$>) ∷ (a -> b) → State s a → State s b 
+  f <$> (State z) =
+    State (\x →
+            let (a, s2) = z x in (f a, s2)) 
+            --( (f . fst) (z $ x), x) )
+  
 -- | Implement the `Apply` instance for `State s`.
 instance Apply (State s) where
-  (<*>) =
-    error "todo"
+  -- Apply f ⇒ (<*>) :: f (a -> b) -> f a -> f b
+  -- Apply (State s) ⇒ (<*>) :: State s (a -> b) -> State s a -> State s b
+  --sab <*> sa = (\f → f <$> sa) <$> sab
+  (State fsab) <*> (State fsa) =
+    let
+      apply s =
+        let
+          (a, s1)  = fsa s
+          (ab, s2) = fsab s1
+        in
+         (ab a, s2) 
+    in
+     State { runState = apply }
 
+    
 -- | Implement the `Applicative` instance for `State s`.
 instance Applicative (State s) where
-  pure =
-    error "todo"
+  -- Applicative ⇒ pure :: a -> f a
+  pure a = State (\s → (a, s))
 
 -- | Implement the `Bind` instance for `State s`.
 -- >>> runState ((const $ put 2) =<< put 1) 0
 -- ((),2)
 instance Bind (State s) where
-  (=<<) =
-    error "todo"
-
+  -- Bind f ⇒ (=<<) :: (a -> f b) -> f a -> f b
+  l =<< (State fas) =
+    State (\s →
+            let
+              (a, s2) = fas s
+              (State fbs) = l a
+            in fbs s2)
+            
+    
 instance Monad (State s) where
 
 -- | Run the `State` seeded with `s` and retrieve the resulting state.
@@ -64,8 +88,7 @@ exec ::
   State s a
   -> s
   -> s
-exec =
-  error "todo"
+exec (State sa) = snd . sa
 
 -- | Run the `State` seeded with `s` and retrieve the resulting value.
 --
@@ -74,8 +97,8 @@ eval ::
   State s a
   -> s
   -> a
-eval =
-  error "todo"
+eval (State sa) = fst . sa
+  
 
 -- | A `State` where the state also distributes into the produced value.
 --
@@ -83,8 +106,7 @@ eval =
 -- (0,0)
 get ::
   State s s
-get =
-  error "todo"
+get = State (\s → (s,s))
 
 -- | A `State` where the resulting state is seeded with the given value.
 --
@@ -93,8 +115,7 @@ get =
 put ::
   s
   -> State s ()
-put =
-  error "todo"
+put s = State (const ((),s))
 
 -- | Find the first element in a `List` that satisfies a given predicate.
 -- It is possible that no element is found, hence an `Optional` result.
@@ -115,8 +136,11 @@ findM ::
   (a -> f Bool)
   -> List a
   -> f (Optional a)
-findM =
-  error "todo"
+findM _ Nil = pure Empty
+findM g (a:.as) =
+  let
+    m fb = join ( (\x → if x then pure (Full a) else (findM g as) ) <$> (fb a) )
+  in m g
 
 -- | Find the first element in a `List` that repeats.
 -- It is possible that no element repeats, hence an `Optional` result.
@@ -128,8 +152,11 @@ firstRepeat ::
   Ord a =>
   List a
   -> Optional a
-firstRepeat =
-  error "todo"
+firstRepeat xs =
+  let
+    p :: Ord b ⇒ b → State (S.Set b) Bool
+    p x = (\set -> (const $ pure (S.member x set)) =<< put (S.insert x set)) =<< get
+  in fst $ runState (findM p xs) S.empty
 
 -- | Remove all duplicate elements in a `List`.
 -- /Tip:/ Use `filtering` and `State` with a @Data.Set#Set@.
