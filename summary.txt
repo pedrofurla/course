@@ -1,0 +1,69 @@
+
+data Id a
+        runId :: Id a -> a
+        mapId :: (a -> b) -> Id a -> Id b
+        bindId :: (a -> Id b) -> Id a -> Id b
+
+data List t = Nil | t :. (List t)
+
+        infinity :: List Integer
+        foldRight :: (a -> b -> b) -> b -> List a -> b
+        foldLeft :: (b -> a -> b) -> b -> List a -> b
+        headOr :: a -> List a -> a
+        product :: List Int -> Int
+        sum :: List Int -> Int
+        length :: List a -> Int
+        map :: (a -> b) -> List a -> List b
+        filter :: (a -> Bool) -> List a -> List a
+        (++) :: List a -> List a -> List a
+        flatten :: List (List a) -> List a
+        flatMap :: (a -> List b) -> List a -> List b
+        seqOptional :: List (Optional a) -> Optional (List a)
+        find :: (a -> Bool) -> List a -> Optional a
+        lengthGT4 :: List a -> Bool
+        reverse :: List a -> List a
+        ...
+
+class Functor f where
+        (<$>) :: (a -> b) -> f a -> f b
+
+    (<$) :: Functor f => a -> f b -> f a
+
+class Functor f => Apply f where
+        (<*>) :: f (a -> b) -> f a -> f b
+
+    lift2 :: Apply f => (a -> b -> c) -> f a -> f b -> f c
+    (*>) :: Apply f => f a -> f b -> f b
+    (<*) :: Apply f => f b -> f a -> f b
+
+class Apply f => Applicative f where
+        pure :: a -> f a
+
+    | Witness that all things with (<*>) and pure also have (<$>).
+    (<$>) :: Applicative f => (a -> b) -> f a -> f b
+
+    sequence :: Applicative f => List (f a) -> f (List a)
+    replicateA :: Applicative f => Int -> f a -> f (List a)
+    filtering :: Applicative f => (a -> f Bool) -> List a -> f (List a)
+
+class Apply f => Bind f where
+        (=<<) :: (a -> f b) -> f a -> f b
+
+    | Witness that all things with (=<<) and (<$>) also have (<*>)
+    (<*>) :: Bind f => f (a -> b) -> f a -> f b
+
+    (>>=) :: Bind f => f a -> (a -> f b) -> f b
+    join :: Bind f => f (f a) -> f a
+    (<=<) :: Bind f => (b -> f c) -> (a -> f b) -> a -> f c
+
+class (Applicative f, Bind f) => Monad f where
+
+newtype State s a = State { runState :: s -> (a, s) }
+
+exec :: State s a -> s -> s
+eval :: State s a -> s -> a
+get :: State s s
+put :: s -> State s ()
+
+
+
