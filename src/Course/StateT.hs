@@ -1,3 +1,5 @@
+{-# LANGUAGE UnicodeSyntax #-}
+
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -27,45 +29,63 @@ newtype StateT s f a =
 
 -- | Implement the `Functor` instance for @StateT s f@ given a @Functor f@.
 instance Functor f => Functor (StateT s f) where
-  (<$>) =
-    error "todo"
+  g <$> (StateT z) =
+    StateT (\x →
+             let f = z x in
+             (\(a ,s2) → (g a, s2)) <$> f)
 
 -- | Implement the `Apply` instance for @StateT s f@ given a @Bind f@.
 instance Bind f => Apply (StateT s f) where
-  (<*>) =
-    error "todo"
+  -- Apply f ⇒ (<*>) :: f (a -> b) -> f a -> f b
+  -- Apply StateT s f ⇒ (<*>) ∷ StateT s f (a → b) → StateT s f a → StateT s f b
+  -- (=<<) :: (a -> f b) -> f a -> f b
+  (StateT g) <*> (StateT z) =
+    StateT (\s →
+             let               
+               f = z s -- f (a, s)
+               -- g ∷ s → f (a → b, s)
+               -- (g s2) ∷ f (a → b, s) )
+               fstmap ∷ (a → b, s) → a → (b, s)
+               fstmap (ab, s') a = (ab a, s')
+               --outside ∷ (a, s) → f (b, s)
+               outside (a, s') = (flip fstmap $ a) <$> (g s')
+             in
+              outside =<< f)
+              --(\(a,s2) → (\(ab,s3) → (ab a,s3)) <$> (g s2)) =<< f ) -- TODO this is horrible, can use kleisli composition here?
 
 -- | Implement the `Applicative` instance for @StateT s f@ given a @Applicative f@.
 instance Monad f => Applicative (StateT s f) where
-  pure =
-    error "todo"
+  pure a = StateT (\s → pure (a, s))
 
 -- | Implement the `Bind` instance for @StateT s f@ given a @Monad f@.
 -- Make sure the state value is passed through in `bind`.
 instance Monad f => Bind (StateT s f) where
-  (=<<) =
-    error "todo"
+  g =<< (StateT z) =
+    StateT (\s →
+             let
+               f = z s -- f (a, s)
+               -- bindfst ∷ (a, s) → f (b, s)
+               bindfst (a, s') = let (StateT k) = (g a) in k s'
+             in
+              f >>= bindfst)
 
 instance Monad f => Monad (StateT s f) where
 
 -- | A `State'` is `StateT` specialised to the `Id` functor.
-type State' s a =
-  StateT s Id a
+type State' s a = StateT s Id a
 
 -- | Provide a constructor for `State'` values.
 state' ::
   (s -> (a, s))
   -> State' s a
-state' =
-  error "todo"
+state' f = StateT (\s → Id $ f s)
 
 -- | Provide an unwrapper for `State'` values.
 runState' ::
   State' s a
   -> s
   -> (a, s)
-runState' =
-  error "todo"
+runState' (StateT g) s = runId $ g s
 
 -- | Run the `StateT` seeded with `s` and retrieve the resulting state.
 execT ::
@@ -73,16 +93,14 @@ execT ::
   StateT s f a
   -> s
   -> f s
-execT =
-  error "todo"
+execT (StateT g) s = snd <$> g s
 
 -- | Run the `State` seeded with `s` and retrieve the resulting state.
 exec' ::
   State' s a
   -> s
   -> s
-exec' =
-  error "todo"
+exec' st s = runId $ execT st s 
 
 -- | Run the `StateT` seeded with `s` and retrieve the resulting value.
 evalT ::
@@ -90,31 +108,27 @@ evalT ::
   StateT s f a
   -> s
   -> f a
-evalT =
-  error "todo"
-
+evalT (StateT g) s = fst <$> g s 
+  
 -- | Run the `State` seeded with `s` and retrieve the resulting value.
 eval' ::
   State' s a
   -> s
   -> a
-eval' =
-  error "todo"
+eval' st s = runId $ evalT st s
 
 -- | A `StateT` where the state also distributes into the produced value.
 getT ::
   Monad f =>
   StateT s f s
-getT =
-  error "todo"
+getT = StateT $ pure . dup where dup x = (x,x)
 
 -- | A `StateT` where the resulting state is seeded with the given value.
 putT ::
   Monad f =>
   s
   -> StateT s f ()
-putT =
-  error "todo"
+putT s = StateT $ pure . (const ((),s))
 
 -- | Remove all duplicate elements in a `List`.
 --
@@ -123,8 +137,14 @@ distinct' ::
   (Ord a, Num a) =>
   List a
   -> List a
-distinct' =
-  error "todo"
+distinct' as =
+  let
+    p :: (Ord b, Num b) ⇒ b → State' (S.Set b) Bool
+    p x = (\set -> (const $ pure (S.member x set)) =<< putT (S.insert x set)) =<< getT
+  in
+  -- filtering :: Applicative f => (a -> f Bool) -> List a -> f (List a)
+  -- let Id((xs,_)) = runStateT (filtering p as) S.empty in xs
+   eval' (filtering p as) S.empty
 
 -- | Remove all duplicate elements in a `List`.
 -- However, if you see a value greater than `100` in the list,
@@ -136,7 +156,17 @@ distinctF ::
   List a
   -> Optional (List a)
 distinctF =
-  error "todo"
+  let
+    -- getT :: Monad f => StateT s f s
+    -- putT :: Monad f => s -> StateT s f ()
+    p :: (Ord b, Num b) ⇒ b → StateT (S.Set b) Optional Bool
+    p x = (\set ->
+            (const $
+             if x P./= 100
+             then pure (S.member x set)
+             else pure False) =<< putT (S.insert x set)) =<< getT
+  in
+   error "todo"
 
 -- | An `OptionalT` is a functor of an `Optional` value.
 data OptionalT f a =
