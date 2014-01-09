@@ -168,8 +168,11 @@ distinct ::
   Ord a =>
   List a
   -> List a
-distinct =
-  error "todo"
+distinct xs =
+  let
+    p :: Ord b ⇒ b → State (S.Set b) Bool -- TODO notice how it's "like" p in first repeat
+    p x = (\set -> (const $ pure (not $ S.member x set)) =<< put (S.insert x set)) =<< get 
+  in fst $ runState (filtering p xs) S.empty
 
 -- | Produce an infinite `List` that seeds with the given value at its head,
 -- then runs the given function for subsequent elements
@@ -183,8 +186,8 @@ produce ::
   (a -> a)
   -> a
   -> List a
-produce =
-  error "todo"
+produce f a = a :. produce f (f a)
+
 
 -- | A happy number is a positive integer, where the sum of the square of its digits eventually reaches 1 after repetition.
 -- In contrast, a sad number (not a happy number) is where the sum of the square of its digits never reaches 1
@@ -210,5 +213,15 @@ produce =
 isHappy ::
   Integer
   -> Bool
-isHappy =
-  error "todo"
+isHappy x =
+  let
+    i2s ∷ Integer → Chars
+    i2s = listh . show
+    sumSqrs ∷ Chars → Integer
+    sumSqrs cs =
+      let square y = y * y
+      in  foldRight ((+) . square) 0  $ (P.toInteger . digitToInt) <$> cs
+    happyPath ∷ Integer → List Integer -- given a number produces the possibly infinite list of steps to arrive at 1 through the happy numbers algorithm
+    happyPath y = produce (sumSqrs . i2s) y
+  in
+    contains 1 $ (firstRepeat . happyPath) x 
