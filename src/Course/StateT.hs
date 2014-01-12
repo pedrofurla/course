@@ -155,7 +155,7 @@ distinctF ::
   (Ord a, Num a) =>
   List a
   -> Optional (List a)
-distinctF =
+distinctF as =
   let
     -- getT :: Monad f => StateT s f s
     -- putT :: Monad f => s -> StateT s f ()
@@ -164,9 +164,9 @@ distinctF =
             (const $
              if x P./= 100
              then pure (S.member x set)
-             else pure False) =<< putT (S.insert x set)) =<< getT
+             else StateT (\_ -> Empty)) =<< putT (S.insert x set)) =<< getT
   in
-   error "todo"
+   evalT (filtering p as) S.empty
 
 -- | An `OptionalT` is a functor of an `Optional` value.
 data OptionalT f a =
@@ -177,23 +177,44 @@ data OptionalT f a =
 
 -- | Implement the `Functor` instance for `OptionalT f` given a Functor f.
 instance Functor f => Functor (OptionalT f) where
-  (<$>) =
-    error "todo"
+  g <$> (OptionalT f) = OptionalT ( (g <$>) <$> f)
 
 -- | Implement the `Apply` instance for `OptionalT f` given a Apply f.
 instance Apply f => Apply (OptionalT f) where
-  (<*>) =
-    error "todo"
-
+  -- (<*>) :: f (a -> b) -> f a -> f b
+  -- (<*>) :: OptionalT f (a -> b) -> OptionalT f a -> OptionalT f b
+  -- (<*>) :: f Optional (a -> b) -> f Optional a -> f Optional b
+  (OptionalT z) <*> (OptionalT x) =
+    OptionalT
+    (
+      let 
+        app ∷ Optional (a -> b) -> (Optional a -> Optional b)
+        app oab = (oab <*>)
+        --map' ∷ f (Optional a -> Optional b)
+        map' = (app <$> z)
+      in
+       map' <*> x)
+    
 -- | Implement the `Applicative` instance for `OptionalT f` given a Applicative f.
 instance Applicative f => Applicative (OptionalT f) where
-  pure =
-    error "todo"
+  pure = OptionalT . (pure . pure)
 
 -- | Implement the `Bind` instance for `OptionalT f` given a Bind f.
 instance Bind f => Bind (OptionalT f) where
-  (=<<) =
-    error "todo"
+  -- (a → f b) → f a → f b
+  -- =<< :: (a -> OptionalT f b) -> OptionalT f a -> OptionalT f b
+  g =<< OptionalT z =
+    OptionalT (
+      let 
+        fempty = const Empty <$> z
+        bindf = runOptionalT . g
+      in
+       (\x -> -- TODO there must be a better way
+         case x of 
+           Full a -> bindf a
+           Empty -> fempty) =<< z
+      )
+   
 
 instance Monad f => Monad (OptionalT f) where
 
@@ -204,24 +225,24 @@ data Logger l a =
 
 -- | Implement the `Functor` instance for `Logger`.
 instance Functor (Logger l) where
-  (<$>) =
-    error "todo"
+  f <$> (Logger xs a) = Logger xs (f a)
 
 -- | Implement the `Apply` instance for `Logger`.
 instance Apply (Logger l) where
-  (<*>) =
-    error "todo"
-
+  (Logger ls f) <*> (Logger rs a) = Logger (ls ++ rs) (f a)
+    
 -- | Implement the `Applicative` instance for `Logger`.
 instance Applicative (Logger l) where
-  pure =
-    error "todo"
+  pure a = Logger Nil a
 
 -- | Implement the `Bind` instance for `Logger`.
 -- The `bind` implementation must append log values to maintain associativity.
 instance Bind (Logger l) where
-  (=<<) =
-    error "todo"
+  f =<< (Logger ls a) =
+    let
+      (Logger ls2 a2) = f a
+    in
+     Logger (ls2 ++ ls) a2
 
 instance Monad (Logger l) where
 
@@ -230,8 +251,13 @@ log1 ::
   l
   -> a
   -> Logger l a
-log1 =
-  error "todo"
+log1 l a = Logger (pure l) a
+
+appendLog ∷
+  l
+  → (Logger l a)
+  → Logger l a
+appendLog l (Logger ls a) = Logger (l :. ls) a 
 
 -- | Remove all duplicate integers from a list. Produce a log as you go.
 -- If there is an element above 100, then abort the entire computation and produce no result.
@@ -241,9 +267,34 @@ log1 =
 -- Other numbers produce no log message.
 --
 -- /Tip:/ Use `filtering` and `StateT` over (`OptionalT` over `Logger` with a @Data.Set#Set@).
+
+type OLoggerT b = (OptionalT (Logger Chars) b)
+type OLoggerT' = OptionalT (Logger Chars)
 distinctG ::
   (Integral a, Show a) =>
   List a
   -> Logger Chars (Optional (List a))
-distinctG =
-  error "todo"
+distinctG as =
+  let
+    -- StateT s f a = StateT ( s → f (a, s) )
+    -- OptionalT f a = f (Optional a)
+    -- Logger l a = Logger (List l) a
+    logAbort x o =
+      o >>= (\_ → OptionalT $ log1 ("aborting > 100: " ++ (listh $ show x)) $ Empty)
+    logEven  x o =
+      o >>= (\v -> OptionalT $ log1 ("even number: " ++  (listh $ show x)) $ Full v)
+    p :: (Show b, Integral b) ⇒ b → StateT (S.Set b) OLoggerT' Bool
+    p x = StateT (
+      \s →
+      let
+        s2 = S.insert x s
+        member = S.member x s
+        ifEven = if even x  then logEven x else id
+        ifg100 = if x > 100 then logAbort x else id
+      in
+        ifg100 $ ifEven $ pure (not member, s2)
+      )
+    filt = runStateT (filtering p as) S.empty
+    (OptionalT(Logger logs oas)) = filt
+  in
+    Logger logs (fst <$> oas)
