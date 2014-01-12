@@ -37,10 +37,8 @@ instance Extend Id where
 -- > reverse =<< ((1 :. 2 :. 3 :. Nil) :. (4 :. 5 :. 6 :. Nil) :. Nil)
 -- [3,2,1,6,5,4]
 instance Extend List where
-  _ <<= Nil =
-    Nil
-  f <<= x@(_ :. t) =
-    f x :. (f <<= t)
+  _ <<= Nil = Nil
+  f <<= x@(_ :. t) = f x :. (f <<= t)
 
 -- | Implement the @Extend@ instance for @Optional@.
 --
@@ -50,8 +48,7 @@ instance Extend List where
 -- >>> id <<= Empty
 -- Empty
 instance Extend Optional where
-  f <<= o =
-    f . Full <$> o
+  f <<= o = f . Full <$> o
 
 -- | Duplicate the functor using extension.
 --
@@ -66,9 +63,7 @@ instance Extend Optional where
 --
 -- >>> cojoin Empty
 -- Empty
-cojoin ::
-  Extend f =>
+cojoin :: Extend f =>
   f a
   -> f (f a)
-cojoin =
-  error "todo"
+cojoin = (id <<=)
