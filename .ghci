@@ -10,3 +10,4 @@
 :set -XScopedTypeVariables
 :set -XOverloadedStrings
 :set -XUnicodeSyntax
+:load Course.ParserExperiments
