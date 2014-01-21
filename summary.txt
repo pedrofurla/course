@@ -58,12 +58,11 @@ class Apply f => Bind f where
 
 class (Applicative f, Bind f) => Monad f where
 
-newtype State s a = State { runState :: s -> (a, s) }
+    newtype State s a = State { runState :: s -> (a, s) }
 
-exec :: State s a -> s -> s
-eval :: State s a -> s -> a
-get :: State s s
-put :: s -> State s ()
-
-
+    exec :: State s a -> s -> s
+    eval :: State s a -> s -> a
+    get :: State s s
+    put :: s -> State s ()
+    findM :: Monad f => (a -> f Bool) -> List a -> f (Optional a)
 
