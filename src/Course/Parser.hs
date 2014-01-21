@@ -163,6 +163,7 @@ fbindParser =
 -- simplifing 
 --     bindParser valueParser X === X
 
+
 -- | Return a parser that puts its input into the given parser and
 --
 --   * if that parser succeeds with a value (a), ignore that value
@@ -225,7 +226,7 @@ infixl 3 |||
 -- Result >< ""
 --
 -- >>> parse (list (digit)) "123abc"
--- Result >abc< ""
+-- Result >abc< "123"
 --
 -- >>> parse (list digit) "abc"
 -- Result >abc< ""
@@ -259,10 +260,10 @@ list (P pa) = -- TODO this impl is odd. Use foldr ? Use the recommened combinato
 -- >>> isErrorResult (parse (many1 (character *> valueParser 'v')) "")
 -- True
 --
--- >>> parse (list (digit)) "123abc"
--- Result >abc< ""
+-- >>> parse (many1 (digit)) "123abc"
+-- Result >abc< "123"
 --
--- >>> isErrorResult(parse (list digit) "abc")
+-- >>> isErrorResult(parse (many1 digit) "abc")
 -- True
 many1 ::
   Parser a
@@ -410,29 +411,6 @@ alpha ::
   Parser Char
 alpha = satisfy isAlpha
 
--- Helper
-toParserList :: Parser a -> Parser (List a)
-toParserList = bindParser (\i -> valueParser (i:.Nil))
-
-concatParser :: Parser (List t) -> Parser (List t) -> Parser (List t)
-concatParser (P p1) (P p2) = 
-  P(\i -> withResultInput (\i2 a2 -> withResultInput (\i3 a3 -> Result i3 $ a2 ++ a3) $ p2 i2  ) $ p1 i)
-
-(~~~) :: 
-  Parser t 
-  -> Parser t 
-  -> Parser (List t)
-l ~~~ r =  concatParser (toParserList l) (toParserList r) 
-
-(~~<) :: Parser t -> Parser (List t) -> Parser (List t)
-l ~~< r =  concatParser (toParserList l) r
-
-(>~~) :: Parser (List t) -> Parser t -> Parser (List t)
-l >~~ r =  concatParser l (toParserList r)
-
-(>~<) :: Parser (List t) -> Parser (List t) -> Parser (List t)
-(>~<) = concatParser
-
 -- | Return a parser that sequences the given list of parsers by producing all their results
 -- but fails on the first failing parser of the list.
 --
@@ -449,8 +427,21 @@ sequenceParser ::
   -> Parser (List a)
 sequenceParser ps = 
   let
-    fold = foldRight (\p pl -> concatParser (toParserList p) pl) (valueParser Nil) ps
-  in fold 
+  in foldRight (~~<) (valueParser Nil) ps
+
+--keisli :: Bind f => (b -> f c) -> (a -> f b) -> a -> f c
+
+(~~<) :: Parser t -> Parser (List t) -> Parser (List t)
+l ~~< r =  bindParser (\c -> bindParser (\as -> valueParser (c :. as)) r) l
+
+(~~~) ::  Parser t  -> Parser t -> Parser (List t)
+l ~~~ r =  l ~~< ( r ~~< valueParser Nil )
+
+(>~~) :: Parser (List t) -> Parser t -> Parser (List t)
+l >~~ r = l >~< (r ~~< valueParser Nil)
+
+(>~<) :: Parser (List t) -> Parser (List t) -> Parser (List t)
+l >~< r = bindParser (\cs -> bindParser (\as -> valueParser (cs ++ as)) r) l
 
 -- | Return a parser that produces the given number of values off the given parser.
 -- This parser fails if the given parser fails in the attempt to produce the given number of values.
@@ -630,73 +621,85 @@ personParser =
   let
     emptyPerson = Person {age = 0, firstName = "", surname = "", gender = 'x', phone = ""}
 
-    toOptionalResult :: ParseResult t -> Optional (ParseResult t)
-    toOptionalResult r =
-      case r of 
-        (Result _ _) -> Full r
-        _ -> Empty
-
     applyUpdates :: List (Person -> Person) -> Person
-    applyUpdates = foldRight (\a b -> a b) emptyPerson
+    applyUpdates = foldRight ($) emptyPerson
 
-    -- an parser with the identity function
-    fskipSpaceP :: Parser (a -> a) 
-    fskipSpaceP = bindParser (const $ valueParser $ id) space
- 
-    updAge     p a = p { age       = a }
-    updName    p a = p { firstName = a }
-    updSurname p a = p { surname   = a }
-    updGender  p a = p { gender    = a }
-    updPhone   p a = p { phone     = a }
+    -- some semi-lenses for the rescue
+    updAge     a p = p { age       = a }
+    updName    a p = p { firstName = a }
+    updSurname a p = p { surname   = a }
+    updGender  a p = p { gender    = a }
+    updPhone   a p = p { phone     = a }
 
-    pParser :: (Person -> a -> Person) -> Parser a -> Parser (Person -> Person)
-    pParser upd parser = bindParser (valueParser . (flip upd)) parser
+    pParser :: (a -> Person -> Person) -> Parser a -> Parser (Person -> Person)
+    pParser upd parser = bindParser (valueParser . upd) parser
 
+    pList :: Parser (List (Person -> Person))
     pList = 
-      (pParser updAge ageParser         :. fskipSpaceP :. 
-       pParser updName firstNameParser  :. fskipSpaceP :. 
-       pParser updSurname surnameParser :. fskipSpaceP :. 
-       pParser updGender genderParser   :. fskipSpaceP :. 
-       pParser updPhone phoneParser     :. Nil)
-    
-    pSequence = sequenceParser pList
-
-    result str = parse pSequence str
+      pParser updAge ageParser 
+      ~~~ 
+      (space >>> pParser updName firstNameParser ) 
+      >~~ 
+      (space >>> pParser updSurname surnameParser)
+      >~~ 
+      (space >>> pParser updGender genderParser)
+      >~~ 
+      (space >>> pParser updPhone phoneParser)
   in
-    P ( \i -> 
-      ( (\(Result left fs) -> Result left (applyUpdates fs)) <$> (toOptionalResult $ result i)) ?? Failed )
-
-
+    bindParser (\pps -> valueParser $ applyUpdates pps) pList
+    --P ( \i -> 
+    --  ( (\(Result left fs) -> Result left (applyUpdates fs)) <$> (toOptionalResult $ result i)) ?? Failed )
 
 -- Make sure all the tests pass!
 
 
 -- | Write a Functor instance for a @Parser@.
 -- /Tip:/ Use @bindParser@ and @valueParser@.
+---
+--- >>> parse (toUpper <$> lower) "aaa"
+--- Result >aa< 'A'
+---
+--- >>> parse (id <$> lower) "aaa"
+--- Result >aa< 'a'
+---
+--- >>> parse ( (toUpper <$>) <$> list lower) "aaa9"
+--- Result >9< "AAA"
+---
+--- >>> parse ( ((+1) <$>)  <$> sequenceParser (natural :. (space >>> natural) :. Nil)) "123 321 a "
+--- Result > a < [124,322]
+--- 
+--- >>> parse ( sequenceParser ( ((+1) <$> natural) :. ((+1) <$> (space >>> natural)) :. Nil)) "123 321 a "
+--- Result > a < [124,322]
 instance Functor Parser where
-  (<$>) =
-     error "todo"
+  f <$> (P p) = bindParser (\i -> valueParser (f i)) (P p)
 
 -- | Write a Apply instance for a @Parser@.
 -- /Tip:/ Use @bindParser@ and @valueParser@.
 instance Apply Parser where
-  (<*>) =
-    error "todo"
+  -- f (a -> b) -> f a -> f b
+  f <*> p = bindParser (\ab -> bindParser (\a -> valueParser $ ab a) p) f
 
 -- | Write an Applicative functor instance for a @Parser@.
 instance Applicative Parser where
-  pure =
-    error "todo"
-
+  pure = valueParser
+    
 -- | Write a Bind instance for a @Parser@.
 instance Bind Parser where
-  (=<<) =
-    error "todo"
+  (=<<) = bindParser
 
 instance Monad Parser where
 
 instance P.Monad Parser where
-  (>>=) =
-    flip (=<<)
-  return =
-    pure
+  (>>=) = flip (=<<)
+  return = pure
+
+-- having the type classes instances makes things *a lot* easier!!!
+personParser5 ::
+  Parser Person
+personParser5 =
+   Person <$> 
+    ageParser <*> 
+    (space >>> firstNameParser) <*> 
+    (space >>> surnameParser) <*> 
+    (space >>> genderParser) <*> 
+    (space >>>phoneParser)
