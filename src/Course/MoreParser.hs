@@ -10,6 +10,8 @@ import Course.Optional
 import Course.Applicative
 import Course.Apply
 import Course.Traversable
+import Course.Bind
+import Course.Functor
 
 -- $setup
 -- >>> :set -XOverloadedStrings
@@ -30,18 +32,31 @@ P p <.> i =
 -- | Write a parser that will parse zero or more spaces.
 spaces ::
   Parser Chars
-spaces =
-  error "todo"
+spaces = list space
 
 -- | Write a function that applies the given parser, then parses 0 or more spaces,
 -- then produces the result of the original parser.
 --
 -- /Tip:/ Use the monad instance.
+
+-- >>> parse  (tok (list digit))  "123   "
+-- Result >< "123"
+-- 
+-- >>> parse  (tok (list digit))  "   123   "
+-- Result >123   < ""
+-- 
+-- >>> parse  (tok (list digit))  "123"
+-- Result >< "123"
+-- 
+-- >>> parse  (tok (list digit))  "q123"
+-- Result >q123< ""
+-- 
+-- >>> parse  (tok (list digit))  "q123 "
+-- Result >q123 < ""
 tok ::
   Parser a
   -> Parser a
-tok =
-  error "todo"
+tok p = (\i -> (\_ -> valueParser i) =<< spaces ) =<< p
 
 -- | Write a function that parses the given char followed by 0 or more spaces.
 --
@@ -49,16 +64,14 @@ tok =
 charTok ::
   Char
   -> Parser Char
-charTok =
-  error "todo"
+charTok = tok . is
 
 -- | Write a parser that parses a comma ',' followed by 0 or more spaces.
 --
 -- /Tip:/ Use `charTok`.
 commaTok ::
   Parser Char
-commaTok =
-  error "todo"
+commaTok = charTok ','
 
 -- | Write a parser that parses either a double-quote or a single-quote.
 --
@@ -74,8 +87,8 @@ commaTok =
 -- True
 quote ::
   Parser Char
-quote =
-  error "todo"
+quote = is '\'' ||| is '"'
+
 
 -- | Write a function that parses the given string (fails otherwise).
 --
@@ -89,8 +102,8 @@ quote =
 string ::
   Chars
   -> Parser Chars
-string =
-  error "todo"
+string = traverse (\a -> is a) 
+  --traverse :: Applicative f => (a -> f b) -> t a -> f (t b)
 
 -- | Write a function that parsers the given string, followed by 0 or more spaces.
 --
@@ -104,8 +117,8 @@ string =
 stringTok ::
   Chars
   -> Parser Chars
-stringTok =
-  error "todo"
+stringTok = tok . string
+
 
 -- | Write a function that tries the given parser, otherwise succeeds by producing the given value.
 --
@@ -120,8 +133,7 @@ option ::
   a
   -> Parser a
   -> Parser a
-option =
-  error "todo"
+option = flip (|||) . valueParser
 
 -- | Write a parser that parses 1 or more digits.
 --
@@ -134,8 +146,7 @@ option =
 -- True
 digits1 ::
   Parser Chars
-digits1 =
-  error "todo"
+digits1 = many1 digit
 
 -- | Write a function that parses one of the characters in the given string.
 --
@@ -149,8 +160,7 @@ digits1 =
 oneof ::
   Chars
   -> Parser Char
-oneof =
-  error "todo"
+oneof = satisfy . (flip elem)
 
 -- | Write a function that parses any character, but fails if it is in the given string.
 --
@@ -164,8 +174,7 @@ oneof =
 noneof ::
   Chars
   -> Parser Char
-noneof =
-  error "todo"
+noneof = satisfy . (flip notElem)
 
 -- | Write a function that applies the first parser, runs the third parser keeping the result,
 -- then runs the second parser and produces the obtained result.
@@ -188,8 +197,10 @@ between ::
   -> Parser c
   -> Parser a
   -> Parser a
-between =
-  error "todo"
+between o c a =
+  (=<<) (\_ ->
+    (=<<) (\ai -> 
+      (=<<) (\_ -> valueParser ai) c ) a) o
 
 -- | Write a function that applies the given parser in between the two given characters.
 --
@@ -211,8 +222,7 @@ betweenCharTok ::
   -> Char
   -> Parser a
   -> Parser a
-betweenCharTok =
-  error "todo"
+betweenCharTok o c  = between (is o) (is c) 
 
 -- | Write a function that parses the character 'u' followed by 4 hex digits and return the character value.
 --
@@ -235,7 +245,12 @@ betweenCharTok =
 hex ::
   Parser Char
 hex =
-  error "todo"
+  let 
+    hexes = thisMany 4 $ satisfy isHexDigit
+    bind :: Parser (Optional Int)
+    bind = (is 'u') >>= (\_ -> hexes >>= (valueParser . readHex) )
+    res = bind >>= (\i -> ((valueParser . chr) <$> i) ?? failed ) 
+  in res
 
 -- | Write a function that produces a non-empty list of values coming off the given parser (which must succeed at least once),
 -- separated by the second given parser.
@@ -257,8 +272,13 @@ sepby1 ::
   Parser a
   -> Parser s
   -> Parser (List a)
-sepby1 =
-  error "todo"
+sepby1 a s = a >>= (\i -> ((list $ s >>> a) >>= (\is' -> valueParser (i:.is'))) ||| valueParser (i:.Nil))
+  --a >>= (\i -> 
+  --  let pI = valueParser i in
+  --  (s >>= const pI) ||| pI
+  --)
+
+
 
 -- | Write a function that produces a list of values coming off the given parser,
 -- separated by the second given parser.
@@ -280,8 +300,7 @@ sepby ::
   Parser a
   -> Parser s
   -> Parser (List a)
-sepby =
-  error "todo"
+sepby a s = sepby1 a s ||| valueParser Nil
 
 -- | Write a parser that asserts that there is no remaining input.
 --
@@ -292,8 +311,7 @@ sepby =
 -- True
 eof ::
   Parser ()
-eof =
-  error "todo"
+eof = P(\i -> if i==Nil then Result Nil () else ExpectedEof i)
 
 -- | Write a parser that produces a characer that satisfies all of the given predicates.
 --
@@ -316,8 +334,10 @@ eof =
 satisfyAll ::
   List (Char -> Bool)
   -> Parser Char
-satisfyAll =
-  error "todo"
+satisfyAll cs = -- TODO impl. in terms of satisfyAll
+    -- satisfy :: (Char -> Bool) -> Parser Char
+    -- sequenceParser :: List (Parser a) -> Parser (List a)
+    satisfy $ and . (cs <*>) . pure
 
 -- | Write a parser that produces a characer that satisfies any of the given predicates.
 --
@@ -337,8 +357,9 @@ satisfyAll =
 satisfyAny ::
   List (Char -> Bool)
   -> Parser Char
-satisfyAny =
-  error "todo"
+satisfyAny cs = -- TODO impl. in terms of satisfyAll
+  satisfy $ or . (cs <*>) . pure
+
 
 -- | Write a parser that parses between the two given characters, separated by a comma character ','.
 --
@@ -349,6 +370,9 @@ satisfyAny =
 --
 -- >>> parse (betweenSepbyComma '[' ']' lower) "[]"
 -- Result >< ""
+--
+-- >>> parse (betweenSepbyComma '[' ']' lower) "[a,b,c]"
+-- Result >< "abc"
 --
 -- >>> isErrorResult (parse (betweenSepbyComma '[' ']' lower) "[A]")
 -- True
@@ -366,5 +390,8 @@ betweenSepbyComma ::
   -> Char
   -> Parser a
   -> Parser (List a)
-betweenSepbyComma =
-  error "todo"
+betweenSepbyComma l r p =
+  -- sepby :: Parser a -> Parser s -> Parser (List a)
+  -- betweenCharTok :: Char -> Char -> Parser a -> Parser a
+  -- charTok :: Char -> Parser Char
+  betweenCharTok l r $ sepby p (is ',')
