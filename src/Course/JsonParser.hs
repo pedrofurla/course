@@ -13,6 +13,8 @@ import Course.Apply
 import Course.Applicative
 import Course.List
 import Course.Optional
+import Course.Monad
+import Course.Bind
 
 -- $setup
 -- >>> :set -XOverloadedStrings
@@ -47,7 +49,15 @@ import Course.Optional
 jsonString ::
   Parser Chars
 jsonString =
-  error "todo"
+  let 
+    quoted = betweenCharTok '"' '"'
+    escaped = (>>>) $ is '\\'
+    escBslash = escaped $ is '\\'
+    escHex = escaped hex
+    escControl = escaped (oneof "bfnrt/")
+    --escCh = escaped ch
+    ch = satisfyAll ( (/= '"') :. (/= '\\') :. Nil )--character
+  in quoted $ list $ (escBslash ||| escControl ||| escHex ||| ch)
 
 -- | Parse a JSON rational.
 --
@@ -75,8 +85,16 @@ jsonString =
 -- True
 jsonNumber ::
   Parser Rational
-jsonNumber =
-  error "todo"
+jsonNumber = 
+  let
+    --toks = sequenceParser (is '-' ||| digit :. list digit :. is '.' :. list digit)
+    bleh = 
+      (\n ds0 right -> (n :. ds0) ++ right) <$> 
+      (option '0' $ is '-') <*> digits1 <*> right -- replacing non-minus with 0 is cheating :)
+    right = option "" $ (++) <$> ((:.Nil) <$> is '.') <*> digits1
+      -- Prelude.toRational <$>
+    n2 =  (?? failed) =<< (valueParser . fst <$>) <$> readFloats <$> bleh
+  in n2
 
 -- | Parse a JSON true literal.
 --
@@ -89,8 +107,7 @@ jsonNumber =
 -- True
 jsonTrue ::
   Parser Chars
-jsonTrue =
-  error "todo"
+jsonTrue = stringTok "true"
 
 -- | Parse a JSON false literal.
 --
@@ -103,8 +120,7 @@ jsonTrue =
 -- True
 jsonFalse ::
   Parser Chars
-jsonFalse =
-  error "todo"
+jsonFalse = stringTok "false"
 
 -- | Parse a JSON null literal.
 --
@@ -117,8 +133,7 @@ jsonFalse =
 -- True
 jsonNull ::
   Parser Chars
-jsonNull =
-  error "todo"
+jsonNull = stringTok "null"
 
 -- | Parse a JSON array.
 --
@@ -141,7 +156,9 @@ jsonNull =
 jsonArray ::
   Parser (List JsonValue)
 jsonArray =
-  error "todo"
+  let
+    inSquares = betweenSepbyComma '[' ']'
+  in inSquares jsonValue
 
 -- | Parse a JSON object.
 --
@@ -161,7 +178,9 @@ jsonArray =
 jsonObject ::
   Parser Assoc
 jsonObject =
-  error "todo"
+  let
+    tuple = (,) <$> jsonString <*> (charTok ':' >>> jsonValue)
+  in betweenSepbyComma '{' '}' tuple
 
 -- | Parse a JSON value.
 --
@@ -177,12 +196,20 @@ jsonObject =
 -- Result >< [("key1",JsonTrue),("key2",JsonArray [JsonRational False (7 % 1),JsonFalse]),("key3",JsonObject [("key4",JsonNull)])]
 jsonValue ::
   Parser JsonValue
-jsonValue =
-   error "todo"
+jsonValue = --  TODO a bunch of ||| could be abstracted out
+  ((const JsonNull) <$> jsonNull)   |||
+  ((const JsonTrue) <$> jsonTrue)   |||
+  ((const JsonFalse) <$> jsonFalse) |||
+  ((JsonRational False) <$> jsonNumber) |||
+  (JsonString <$> jsonString) |||
+  (JsonArray <$> jsonArray)   |||
+  (JsonObject <$> jsonObject)
 
 -- | Read a file into a JSON value.
 --
 -- /Tip:/ Use @System.IO#readFile@ and `jsonValue`.
+-- >>> readJsonValue ""
+-- bleh
 readJsonValue ::
   Filename
   -> IO (ParseResult JsonValue)

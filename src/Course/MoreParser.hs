@@ -222,7 +222,7 @@ betweenCharTok ::
   -> Char
   -> Parser a
   -> Parser a
-betweenCharTok o c  = between (is o) (is c) 
+betweenCharTok o c  = between (charTok o) (charTok c) 
 
 -- | Write a function that parses the character 'u' followed by 4 hex digits and return the character value.
 --
@@ -248,7 +248,8 @@ hex =
   let 
     hexes = thisMany 4 $ satisfy isHexDigit
     bind :: Parser (Optional Int)
-    bind = (is 'u') >>= (\_ -> hexes >>= (valueParser . readHex) )
+  --  bind = (is 'u') >>= (\_ -> hexes >>= (valueParser . readHex) )
+    bind = (is 'u') >>> hexes >>= (valueParser . readHex) 
     res = bind >>= (\i -> ((valueParser . chr) <$> i) ?? failed ) 
   in res
 
@@ -394,4 +395,4 @@ betweenSepbyComma l r p =
   -- sepby :: Parser a -> Parser s -> Parser (List a)
   -- betweenCharTok :: Char -> Char -> Parser a -> Parser a
   -- charTok :: Char -> Parser Char
-  betweenCharTok l r $ sepby p (is ',')
+  betweenCharTok l r $ sepby p (charTok ',')
