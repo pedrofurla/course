@@ -1,15 +1,16 @@
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Course.Validation where
 
-import qualified Prelude as P(String)
 import Course.Core
+import qualified Prelude as P (String)
 
 -- $setup
 -- >>> import Test.QuickCheck
 -- >>> import qualified Prelude as P(fmap, either)
 -- >>> instance Arbitrary a => Arbitrary (Validation a) where arbitrary = P.fmap (P.either Error Value) arbitrary
+
 data Validation a = Error Err | Value a
   deriving (Eq, Show)
 
@@ -28,6 +29,10 @@ isError :: Validation a -> Bool
 isError (Error _) = True
 isError (Value _) = False
 
+isOne :: Int -> Bool
+isOne 1 = True
+isOne _ = False
+
 -- | Returns whether or not the given validation is a value.
 --
 -- >>> isValue (Error "message")
@@ -39,6 +44,22 @@ isError (Value _) = False
 -- prop> \x -> isValue x /= isError x
 isValue :: Validation a -> Bool
 isValue = not . isError
+
+-- function add(x, y) {
+--   return x + y
+-- }
+
+-- function add(x) {
+--   return function(y) {
+--     return x + y
+--   }
+-- }
+
+-- Int -> (Int -> Int)
+add :: Int -> Int -> Int
+add x y = x + y
+
+-- (g . f) x = g(f(x))
 
 -- | Maps a function on a validation's value side.
 --
@@ -68,6 +89,10 @@ mapValidation f (Value a) = Value (f a)
 bindValidation :: (a -> Validation b) -> Validation a -> Validation b
 bindValidation _ (Error s) = Error s
 bindValidation f (Value a) = f a
+
+isTrue :: Bool -> Validation Bool
+isTrue True = Value True
+isTrue _ = Error "not true"
 
 -- | Returns a validation's value side or the given default if it is an error.
 --
