@@ -14,3 +14,4 @@
 :set -XOverloadedStrings
 :set -XRebindableSyntax
 :def test (\arg -> Prelude.return Prelude.$ Prelude.unlines [":reload", "test " Prelude.++ arg])
+:set -fmax-valid-hole-fits=2
