@@ -80,8 +80,6 @@ optional f b oa = mapOptional f oa ?? b
 
 -- optional _full _empty optionalValue
 
--- TODO seqOptional in List.hs
-
 applyOptional :: Optional (a -> b) -> Optional a -> Optional b
 applyOptional f a = bindOptional (\f' -> mapOptional f' a) f
 

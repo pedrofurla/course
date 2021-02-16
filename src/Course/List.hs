@@ -174,10 +174,7 @@ map f = foldRight ((:.) . f) Nil
 --
 -- prop> \x -> filter (const False) x == Nil
 filter :: (a -> Bool) -> List a -> List a
-filter p =
-  foldRight
-    (\x xs -> if p x then x :. xs else xs)
-    Nil
+filter p = foldRight (\x xs -> if p x then x :. xs else xs) Nil
 
 -- | Append two lists to a new list.
 --
@@ -258,9 +255,8 @@ flattenAgain = flatMap id
 -- >>> seqOptional (Empty :. map Full infinity)
 -- Empty
 
--- TODO come back after optional
 seqOptional :: List (Optional a) -> Optional (List a)
-seqOptional = undefined
+seqOptional = foldRight (twiceOptional (:.)) (Full Nil)
 
 -- let f Empty Empty = Empty
 --     f (Full x) Empty = Full (x :. Nil)
@@ -321,7 +317,9 @@ lengthGT4 _ = False
 reverse :: List a -> List a
 reverse = foldLeft (flip (:.)) Nil
 
--- reverse as = foldRight (flip (.) . (:.)) id Nil as
+-- foldRight version of reverse plumenator walked me through
+-- on stream 🤯:
+-- reverse as = foldRight (flip (.) . (:.)) id as Nil
 
 -- reverse xs =
 --   let (|>) = flip (.)
@@ -333,8 +331,7 @@ reverse = foldLeft (flip (:.)) Nil
 --     (|>) = flip (.)
 
 -- 1 :. 2 :. 3 :. Nil
--- 1 :. 2 :. 3 :. Nil
--- ((3 :.) . (2 :.) . (1 :.)) Nil
+-- 1 `f` 2 `f` 3 `f` id
 
 -- ((1 :.) |> (2 :.) |> (3 :.)) Nil
 -- where (|>) = flip (.)
