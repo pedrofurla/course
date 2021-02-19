@@ -24,6 +24,14 @@ class Functor k where
 
 infixl 4 <$>
 
+-- data type that is not a functor
+-- newtype T a = T (a -> Int)
+
+-- Cannot create a `T b` below to implement fmap
+-- instance Functor T where
+--   (<$>) :: (a -> b) -> T a -> T b
+--   (<$>) f (T a) = _t
+
 -- $setup
 -- >>> :set -XOverloadedStrings
 -- >>> import Course.Core
