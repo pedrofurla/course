@@ -1,7 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE RebindableSyntax #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Course.Monad where
 
@@ -11,7 +11,7 @@ import Course.ExactlyOne
 import Course.Functor
 import Course.List
 import Course.Optional
-import qualified Prelude as P((=<<))
+import qualified Prelude as P ((=<<))
 
 -- | All instances of the `Monad` type-class must satisfy one law. This law
 -- is not checked by the compiler. This law is given as:
@@ -31,8 +31,8 @@ class Applicative k => Monad k where
   -- Pronounced, bind.
   (=<<) :: (a -> k b) -> k a -> k b
 
-  -- (>>=) :: k a -> (a -> k b) -> k b
-  -- (>>=) = flip (=<<)
+-- (>>=) :: k a -> (a -> k b) -> k b
+-- (>>=) = flip (=<<)
 
 infixr 1 =<<
 
@@ -67,8 +67,9 @@ instance Monad List where
 instance Monad Optional where
   (=<<) :: (a -> Optional b) -> Optional a -> Optional b
   (=<<) f = optional f Empty
-  -- (=<<) _ Empty = Empty
-  -- (=<<) f (Full a) = f a
+
+-- (=<<) _ Empty = Empty
+-- (=<<) f (Full a) = f a
 
 -- | Binds a function on the reader ((->) t).
 --
