@@ -12,7 +12,7 @@ import Course.Functor
 import Course.List
 import Course.Monad
 import Course.Optional
-import Data.Bifunctor as B
+import qualified Data.Bifunctor as B
 import qualified Data.Set as S
 import qualified Prelude as P
 
@@ -64,7 +64,12 @@ put s = State (const ((), s))
 -- (10,6)
 instance Functor (State s) where
   (<$>) :: (a -> b) -> State s a -> State s b
-  (<$>) f ssa = State (B.first f . runState ssa)
+  (<$>) f ssa = State (first f . runState ssa)
+
+-- first :: Arrow a => a b c -> a (b, d) (c, d)
+-- a ~ (->)
+-- (->) b c -> (->) (b, d) (c, d)
+-- (b -> c) -> (b, d) -> (c, d)
 
 -- | Implement the `Applicative` instance for `State s`.
 --

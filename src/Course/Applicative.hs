@@ -68,10 +68,13 @@ instance Applicative ExactlyOne where
   (<*>) (ExactlyOne f) (ExactlyOne a) = pure (f a)
 
 -- * The law of identity
+
 -- `∀x. pure id <*> x = x`
 -- (pure id <*> ExactlyOne 1) == (ExactlyOne 1)
 --
+
 -- * The law of composition
+
 -- `∀u v w. pure (.) <*> u <*> v <*> w = u <*> (v <*> w)`
 
 -- f :: ExactlyOne (Int -> Int)
@@ -87,10 +90,12 @@ instance Applicative ExactlyOne where
 -- proveComposition = (pure (.) <*> f <*> g <*> x) == (f <*> (g <*> x))
 
 -- * The law of homomorphism
+
 -- `∀f x. pure f <*> pure x = pure (f x)`
 -- (pure (+1) <*> pure 2) == pure ((+1) 2)
 
 -- * The law of interchange
+
 --   `∀u y. u <*> pure y = pure ($ y) <*> u`
 
 -- | Insert into a List.
@@ -176,6 +181,7 @@ instance Applicative ((->) t) where
 -- (<$>) :: (a -> b) -> k a -> k b
 lift2 :: Applicative k => (a -> b -> c) -> k a -> k b -> k c
 lift2 f ka kb = f <$> ka <*> kb
+
 -- lift2 f ka kb = pure f <*> ka <*> kb
 
 -- | Apply a ternary function in the environment.
