@@ -334,5 +334,5 @@ distinctG xs = runOptionalT $ evalT (filtering p xs) S.empty
 
 onFull :: Applicative k => (t -> k (Optional a)) -> Optional t -> k (Optional a)
 onFull g o = case o of
-  Empty -> pure
+  Empty -> pure Empty
   Full a -> g a
