@@ -47,7 +47,7 @@ instance Extend List where
   (<<=) lab = (lab <$>) . foldRight f Nil
     where
       f a Nil = (a :. Nil) :. Nil
-      f a lla@(h :. t) = (a :. h) :. lla
+      f a lla@(h :. _) = (a :. h) :. lla
 
 -- (<<=) lab as@(_ :. t) = let b = lab as in b :. (lab <<= t)
 

@@ -496,13 +496,10 @@ zipWith f (a :. as) (b :. bs) =
 zipWith _ _ _ =
   Nil
 
-unfoldr ::
-  (a -> Optional (b, a)) ->
-  a ->
-  List b
-unfoldr f b =
-  case f b of
-    Full (a, z) -> a :. unfoldr f z
+unfoldr :: (a -> Optional (b, a)) -> a -> List b
+unfoldr f x =
+  case f x of
+    Full (y, x') -> y :. unfoldr f x'
     Empty -> Nil
 
 lines ::
