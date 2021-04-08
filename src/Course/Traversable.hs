@@ -38,6 +38,10 @@ instance Traversable List where
     -> k (List b)
   traverse f =
     foldRight (\a b -> (:.) <$> f a <*> b) (pure Nil)
+-- (:.)       :: ∀   a. a -> List a -> List a
+-- ((:.) <$>) :: ∀ k t. k t -> k (List t -> List t)
+-- (f a)      :: k b
+-- b          :: k (List b)
 
 instance Traversable ExactlyOne where
   traverse ::
@@ -45,8 +49,7 @@ instance Traversable ExactlyOne where
     (a -> k b)
     -> ExactlyOne a
     -> k (ExactlyOne b)
-  traverse =
-    error "todo: Course.Traversable traverse#instance ExactlyOne"
+  traverse f (ExactlyOne a) = ExactlyOne <$> f a
 
 instance Traversable Optional where
   traverse ::
@@ -54,8 +57,7 @@ instance Traversable Optional where
     (a -> k b)
     -> Optional a
     -> k (Optional b)
-  traverse =
-    error "todo: Course.Traversable traverse#instance Optional"
+  traverse f = optional ((Full <$>) . f) (pure Empty)  
 
 -- | Sequences a traversable value of structures to a structure of a traversable value.
 --

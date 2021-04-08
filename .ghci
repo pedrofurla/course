@@ -1,7 +1,7 @@
 :set -isrc
 :set -package time
 :set -package containers
-:l src/Course.hs src/Test/Loader.hs
+-- :l src/Course.hs src/Test/Loader.hs -- stack doesn't like when we try to load these ourselves
 :m + Test.Loader
 :set prompt ">> "
 :set -Wall
@@ -13,4 +13,7 @@
 :set -XScopedTypeVariables
 :set -XOverloadedStrings
 :set -XRebindableSyntax
+:set -XTypeApplications -fprint-explicit-foralls -fprint-explicit-kinds
+import qualified Data.Set as S
+import qualified Data.Function as F
 :def test (\arg -> Prelude.return Prelude.$ Prelude.unlines [":reload", "test " Prelude.++ arg])

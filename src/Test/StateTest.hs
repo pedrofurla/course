@@ -24,6 +24,7 @@ module Test.StateTest (
 
 import           Data.List          (nub)
 import qualified Prelude            as P ((++))
+import qualified Data.Function      as P
 
 import           Test.Framework     (TestTree, testCase, testGroup,
                                      testProperty, test, (@?=))
@@ -35,7 +36,7 @@ import           Course.Functor     ((<$>))
 import           Course.List        (List (..), filter, flatMap, hlist, length,
                                      listh, span, (++))
 import           Course.Monad
-import           Course.Optional    (Optional (Empty, Full))
+import           Course.Optional    (Optional (Empty, Full), (??))
 import           Course.State       (State (State), distinct, eval, exec, findM,
                                      firstRepeat, get, isHappy, put, runState)
 
@@ -118,22 +119,30 @@ firstRepeatTest =
       firstRepeat (listh "abxdexgg") @?= Full 'x'
   , testCase "no repeats" $
       firstRepeat (listh ['a'..'z']) @?= Empty
-  , testProperty "finds repeats" $ \xs ->
-      case firstRepeat (xs :: List Integer) of
+  , testProperty "finds repeats" $ \(xs :: List Integer) ->
+      case firstRepeat xs of
         Empty ->
           let xs' = hlist xs
           in nub xs' == xs'
         Full x -> length (filter (== x) xs) > 1
-  , testProperty "removing repeats matches nub" $ \xs ->
-      case firstRepeat (xs :: List Integer) of
-        Empty -> True
-        Full x ->
-          let
-            (l, rx :. rs) = span (/= x) xs
-            (l2, _) = span (/= x) rs
-            l3 = hlist (l ++ rx :. l2)
-          in
-            nub l3 == l3
+--  , testProperty "removing repeats matches nub" $ \xs ->
+--      case firstRepeat (xs :: List Integer) of
+--        Empty -> True
+--        Full x ->
+--          let
+--            (l, rx :. rs) = span (/= x) xs
+--            (l2, _) = span (/= x) rs
+--            l3 = hlist (l ++ rx :. l2)
+--          in
+--            nub l3 == l3
+  , testProperty "removing repeats matches nub" $ \(xs :: List Integer) ->
+      let xs' = hlist $
+            P.fix (\r as ->
+              let
+                rep = firstRepeat as
+                as' = ((\a -> (\a' -> if a == a' then Nil else a' :. Nil) =<< as) <$> rep) ?? as
+              in if as' /= as then r as' else as') xs
+      in nub xs' == xs'
   ]
 
 distinctTest :: TestTree

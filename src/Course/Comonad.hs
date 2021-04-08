@@ -29,17 +29,17 @@ instance Comonad ExactlyOne where
   copure ::
     ExactlyOne a
     -> a
-  copure =
-    error "todo: Course.Comonad copure#instance ExactlyOne"
+  copure (ExactlyOne a) = a
 
 -- | Witness that all things with (<<=) and copure also have (<$>).
 --
 -- >>> (+10) <$$> ExactlyOne 7
+-- cojoin ::(<<=) :: (k a -> b) -> k a -> k b
+-- Extend k => k a -> k (k a)
 -- ExactlyOne 17
-(<$$>) ::
+(<$$>) :: forall k a b.
   Comonad k =>
   (a -> b)
   -> k a
   -> k b
-(<$$>) =
-  error "todo: Course.Comonad#(<$>)"
+(<$$>) f a = f . copure <<= a
