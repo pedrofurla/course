@@ -154,8 +154,7 @@ firstRepeat as = eval (findM p as) S.empty
 distinct :: Ord a => List a -> List a
 distinct as = eval (filtering p as) S.empty
   where
-    -- p x = State (\s -> (S.notMember x s, S.insert x s))
-    p x = get >>= \s -> put (S.insert x s) >>= const (pure (S.member x s))
+    p x = State (\s -> (S.notMember x s, S.insert x s))
 
 -- | A happy number is a positive integer, where the sum of the square of its digits
 -- eventually reaches 1 after repetition.
